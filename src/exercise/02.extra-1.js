@@ -27,21 +27,18 @@ function asyncReducer(state, action) {
   }
 }
 
-const useAsync = (asyncCallback, initialState, dependencies) => {
+function useAsync(asyncCallback, initialState) {
   const [state, dispatch] = React.useReducer(asyncReducer, {
     status: 'idle',
     data: null,
     error: null,
     ...initialState,
   })
-
   React.useEffect(() => {
-    // 💰 this first early-exit bit is a little tricky, so let me give you a hint:
     const promise = asyncCallback()
     if (!promise) {
       return
     }
-    // then you can dispatch and handle the promise etc...
     dispatch({type: 'pending'})
     promise.then(
       data => {
@@ -51,36 +48,31 @@ const useAsync = (asyncCallback, initialState, dependencies) => {
         dispatch({type: 'rejected', error})
       },
     )
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, dependencies)
-
-  return state;
-};
+  }, [asyncCallback])
+  return state
+}
 
 function PokemonInfo({pokemonName}) {
-  // 🐨 move both the useReducer and useEffect hooks to a custom hook called useAsync
-  // here's how you use it:
-  const state = useAsync(
-    () => {
-      if (!pokemonName) {
-        return
-      }
-      return fetchPokemon(pokemonName)
-    },
-    {status: pokemonName ? 'pending' : 'idle'},
-    [pokemonName],
-  )
+  const asyncCallback = React.useCallback(() => {
+    if (!pokemonName) {
+      return
+    }
+    return fetchPokemon(pokemonName)
+  }, [pokemonName])
 
-  const {data, status, error} = state
+  const state = useAsync(asyncCallback, {
+    status: pokemonName ? 'pending' : 'idle',
+  })
+  const {data: pokemon, status, error} = state
 
-  if (status === 'idle' || !pokemonName) {
+  if (status === 'idle') {
     return 'Submit a pokemon'
   } else if (status === 'pending') {
     return <PokemonInfoFallback name={pokemonName} />
   } else if (status === 'rejected') {
     throw error
   } else if (status === 'resolved') {
-    return <PokemonDataView pokemon={data} />
+    return <PokemonDataView pokemon={pokemon} />
   }
 
   throw new Error('This should be impossible')
